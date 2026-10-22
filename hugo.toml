@@ -1,0 +1,92 @@
+baseURL = 'https://gukuyaa.github.io/'
+locale = 'zh-cn'
+defaultContentLanguage = 'zh-cn'
+hasCJKLanguage = true
+title = 'lovyy 的博客'
+theme = 'PaperMod'
+
+enableRobotsTXT = true
+enableEmoji = true
+buildDrafts = false
+buildFuture = false
+buildExpired = false
+
+[pagination]
+  pagerSize = 20
+
+[params]
+  env = 'production'
+  title = 'lovyy 的博客'
+  description = '金煜博的算法竞赛笔记、C++ 模板与题解'
+  keywords = ['ACM', '算法竞赛', 'C++', 'OI', '题解', '模板']
+  author = '金煜博'
+  DateFormat = '2006-01-02'
+  defaultTheme = 'auto'
+  ShowReadingTime = true
+  ShowShareButtons = true
+  ShowPostNavLinks = true
+  ShowBreadCrumbs = true
+  ShowCodeCopyButtons = true
+  ShowWordCount = true
+  ShowRssButtonInSectionTermList = true
+  UseHugoToc = true
+  showtoc = true
+  tocopen = false
+  comments = false
+
+  [params.homeInfoParams]
+    Title = '你好，我是金煜博 👋'
+    Content = """
+这里是我的个人博客，主要记录 **算法竞赛**、**C++ 模板** 和 **题解**。
+
+以前发在洛谷专栏的模板与题解会陆续迁移到这里，方便检索和长期维护。
+"""
+
+  [[params.socialIcons]]
+      name = 'github'
+      url = 'https://github.com/gukuyaa'
+    [[params.socialIcons]]
+      name = 'rss'
+      url = 'index.xml'
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+    [markup.goldmark.extensions.passthrough]
+      enable = true
+      [markup.goldmark.extensions.passthrough.delimiters]
+        block = [['$$', '$$'], ['\[', '\]']]
+        inline = [['$', '$'], ['\(', '\)']]
+  [markup.highlight]
+    noClasses = false
+    guessSyntax = true
+    lineNos = false
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+
+[[menu.main]]
+  identifier = 'posts'
+  name = '文章'
+  url = '/posts/'
+  weight = 10
+
+[[menu.main]]
+  identifier = 'tags'
+  name = '标签'
+  url = '/tags/'
+  weight = 20
+
+[[menu.main]]
+  identifier = 'archives'
+  name = '归档'
+  url = '/archives/'
+  weight = 30
+
+[[menu.main]]
+  identifier = 'about'
+  name = '关于'
+  url = '/about/'
+  weight = 40
+
