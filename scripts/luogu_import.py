@@ -15,6 +15,7 @@ import http.cookiejar
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -24,6 +25,8 @@ from pathlib import Path
 BASE = 'https://www.luogu.com.cn'
 UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36')
+CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+CHROME_PROFILE = None
 ROOT = Path(__file__).resolve().parent.parent
 POSTS_DIR = ROOT / 'content' / 'posts'
 IMG_DIR = ROOT / 'static' / 'images' / 'luogu'
@@ -63,6 +66,21 @@ def get(opener, url, tries=3):
     raise RuntimeError(f'请求失败 {url}: {last}')
 
 
+def chrome_html(url, timeout=120):
+    """用无头 Chrome 打开页面（带上登录态配置），拿到渲染后的 HTML。"""
+    cmd = [CHROME, '--headless=new', '--disable-gpu', '--no-sandbox',
+           f'--user-data-dir={CHROME_PROFILE}', '--virtual-time-budget=20000',
+           '--dump-dom', url]
+    proc = subprocess.run(cmd, capture_output=True, timeout=timeout)
+    return proc.stdout.decode('utf-8', 'replace')
+
+
+def page_html(opener, url):
+    if CHROME_PROFILE:
+        return chrome_html(url)
+    return get(opener, url)
+
+
 def parse_context(html):
     m = re.search(
         r'<script id="lentille-context" type="application/json">(.*?)</script>',
@@ -76,7 +94,7 @@ def fetch_collection(opener, collection_id, max_pages=100):
     articles, seen, total = [], set(), 0
     for page in range(1, max_pages + 1):
         url = f'{BASE}/article/collection/{collection_id}?page={page}'
-        data = parse_context(get(opener, url)).get('data') or {}
+        data = parse_context(page_html(opener, url)).get('data') or {}
         coll = data.get('collection') or {}
         listing = data.get('articles') or {}
         total = listing.get('count') or 0
@@ -96,7 +114,7 @@ def fetch_collection(opener, collection_id, max_pages=100):
 
 
 def fetch_article(opener, lid):
-    data = parse_context(get(opener, f'{BASE}/article/{lid}')).get('data') or {}
+    data = parse_context(page_html(opener, f'{BASE}/article/{lid}')).get('data') or {}
     article = data.get('article')
     if not article:
         raise RuntimeError(f'文章 {lid} 不存在或无权访问')
@@ -180,25 +198,38 @@ def build_post(article, markdown, collection_name):
 
 def main():
     parser = argparse.ArgumentParser(description='迁移洛谷专栏到 Hugo')
-    parser.add_argument('target', help='专栏链接/ID，或单篇文章链接/lid')
+    parser.add_argument('targets', nargs='+',
+                        help='专栏链接/ID 或单篇文章链接（可一次传多个）')
     parser.add_argument('--limit', type=int, default=0, help='最多迁移 N 篇')
     parser.add_argument('--force', action='store_true', help='覆盖已存在的文章')
     parser.add_argument('--dry-run', action='store_true', help='只抓取和打印，不写文件')
     parser.add_argument('--no-images', action='store_true', help='不下载图片')
     parser.add_argument('--out', default=str(POSTS_DIR), help='输出目录')
+    parser.add_argument('--chrome-profile', default=None,
+                        help='使用带洛谷登录态的 Chrome 配置目录抓取（用于非公开文章）')
     args = parser.parse_args()
 
-    raw = args.target.strip()
+    global CHROME_PROFILE
+    CHROME_PROFILE = args.chrome_profile
+
     opener = make_opener()
-    m = re.search(r'/article/collection/(\d+)', raw)
-    if m or re.fullmatch(r'\d+', raw):
-        cid = m.group(1) if m else raw
-        articles, total = fetch_collection(opener, cid)
-        print(f'专栏 {cid} 共 {total} 篇，列表抓到 {len(articles)} 篇')
-    else:
-        lid = raw.rstrip('/').split('/')[-1]
-        articles = [{'lid': lid, 'title': None, 'collection': None}]
-        print(f'单篇文章：{lid}')
+    articles = []
+    seen = set()
+    for raw in args.targets:
+        raw = raw.strip()
+        m = re.search(r'/article/collection/(\d+)', raw)
+        if m or re.fullmatch(r'\d+', raw):
+            cid = m.group(1) if m else raw
+            batch, total = fetch_collection(opener, cid)
+            print(f'专栏 {cid} 共 {total} 篇，列表抓到 {len(batch)} 篇')
+        else:
+            lid = raw.rstrip('/').split('/')[-1]
+            batch = [{'lid': lid, 'title': None, 'collection': None}]
+        for item in batch:
+            if item['lid'] not in seen:
+                seen.add(item['lid'])
+                articles.append(item)
+    print(f'待迁移文章：{len(articles)} 篇')
 
     if args.limit:
         articles = articles[:args.limit]
